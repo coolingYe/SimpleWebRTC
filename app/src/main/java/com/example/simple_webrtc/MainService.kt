@@ -1,19 +1,25 @@
 package com.example.simple_webrtc
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.example.simple_webrtc.rtc.WebRTCClient
 import com.example.simple_webrtc.utils.Constant
 import com.example.simple_webrtc.utils.Log
 import java.io.IOException
 import java.net.ServerSocket
+import java.net.Socket
 
 class MainService : Service(), Runnable {
 
+    private val binder = MainBinder()
     private var serverSocket: ServerSocket? = null
+    private var socket: Socket? = null
 
     @Volatile
     private var isServerSocketRunning = true
@@ -24,7 +30,7 @@ class MainService : Service(), Runnable {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        return null
+        return binder
     }
 
     override fun run() {
@@ -32,9 +38,11 @@ class MainService : Service(), Runnable {
             serverSocket = ServerSocket(Constant.SERVER_HTTP_PORT)
             while (isServerSocketRunning) {
                 try {
-                    val socket = serverSocket!!.accept()
+                    socket = serverSocket!!.accept()
+                    socket?.let {
+                        WebRTCClient().createIncomingCall(binder, it)
+                    }
                     Log.d(this, "MainService new incoming connection")
-                    SocketService.createIncomingCall(socket)
                 } catch (e: IOException) {
                     // ignore
                 }
@@ -50,10 +58,27 @@ class MainService : Service(), Runnable {
         fun getService(): MainService {
             return this@MainService
         }
+
+        fun getSocket(): Socket? {
+            return socket
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isServerSocketRunning = false
+    }
+
+    companion object {
+
+        fun start(ctx: Context) {
+            val startIntent = Intent(ctx, MainService::class.java)
+            ctx.startService(startIntent)
+        }
+
+        fun stop(ctx: Context) {
+            val stopIntent = Intent(ctx, MainService::class.java)
+            ctx.stopService(stopIntent)
+        }
     }
 }

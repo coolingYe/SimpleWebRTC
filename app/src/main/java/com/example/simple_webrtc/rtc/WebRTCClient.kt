@@ -1,17 +1,21 @@
 package com.example.simple_webrtc.rtc
 
+import com.example.simple_webrtc.MainService
 import com.example.simple_webrtc.SocketService
 import com.example.simple_webrtc.utils.Log
 import com.example.simple_webrtc.utils.PacketWriter
+import com.example.simple_webrtc.utils.Utils
+import org.json.JSONException
 import org.json.JSONObject
 import org.webrtc.*
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.Socket
 import java.net.SocketException
+import java.nio.ByteBuffer
 
 
-class WebRTCClient: SocketService {
+class WebRTCClient : SocketService {
     private lateinit var peerConnection: PeerConnection
     private lateinit var peerConnectionFactory: PeerConnectionFactory
 
@@ -22,20 +26,26 @@ class WebRTCClient: SocketService {
 
     private lateinit var videoCapture: VideoCapturer
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
-    private val eglBaseContext = EglBase.create().eglBaseContext
+    private lateinit var eglBase: EglBase
     private var dataChannel: DataChannel? = null
     private var offer: String? = null
 
-    private var localPlayerView: SurfaceViewRenderer? = null
-    private var netWorkPlayerView: SurfaceViewRenderer? = null
+    private var playerView: SurfaceViewRenderer? = null
+    private var proxyVideoSink = ProxyVideoSink()
+
 
     private var isIncomingCall = false
     private val sdpMediaConstraints = MediaConstraints()
+    private var callContext: CallContext? = null
+
+    private var binder: MainService.MainBinder? = null
 
     constructor(
+        binder: MainService.MainBinder,
         commSocket: Socket,
         offer: String
     ) : super(commSocket) {
+        this.binder = binder
         Log.d(this, "RTCCall() created for incoming calls")
         this.offer = offer
     }
@@ -46,8 +56,8 @@ class WebRTCClient: SocketService {
     }
 
     companion object {
-        const val VIDEO_TRACK_ID = "ARDAMSv0"
-        const val AUDIO_TRACK_ID = "ARDAMSa0"
+        const val VIDEO_TRACK_ID = "Video1"
+        const val AUDIO_TRACK_ID = "Audio1"
     }
 
     fun start(isIncomingCall: Boolean) {
@@ -62,9 +72,8 @@ class WebRTCClient: SocketService {
 
     private fun initPeer() {
         val options = PeerConnectionFactory.Options()
-        val encoderFactory = DefaultVideoEncoderFactory(eglBaseContext, true, true)
-        val decoderFactory = DefaultVideoDecoderFactory(eglBaseContext)
-
+        val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
+        val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
 
         peerConnectionFactory = PeerConnectionFactory.builder()
             .setOptions(options)
@@ -72,130 +81,264 @@ class WebRTCClient: SocketService {
             .setVideoDecoderFactory(decoderFactory)
             .createPeerConnectionFactory()
 
-        sdpMediaConstraints.optional.add(MediaConstraints.KeyValuePair("offerToReceiveVideo", "true"))
-        sdpMediaConstraints.optional.add(MediaConstraints.KeyValuePair("DtlsSrtpKeyAgreement", "false"))
+        sdpMediaConstraints.optional.add(
+            MediaConstraints.KeyValuePair(
+                "offerToReceiveVideo",
+                "true"
+            )
+        )
+        sdpMediaConstraints.optional.add(
+            MediaConstraints.KeyValuePair(
+                "offerToReceiveAudio",
+                "true"
+            )
+        )
+        sdpMediaConstraints.optional.add(
+            MediaConstraints.KeyValuePair(
+                "DtlsSrtpKeyAgreement",
+                "true"
+            )
+        )
     }
 
-    fun setLocalPlayerView(localPlayerView: SurfaceViewRenderer) {
-        this.localPlayerView = localPlayerView
+    fun setEglBase(eglBase: EglBase) {
+        this.eglBase = eglBase
     }
 
-    fun setNetWorkPlayerView(netWorkPlayerView: SurfaceViewRenderer) {
-        this.netWorkPlayerView = netWorkPlayerView
+    fun setProxyVideoSink(proxyVideoSink: ProxyVideoSink) {
+        this.proxyVideoSink = proxyVideoSink
+    }
+
+    fun setPlayerView(playerView: SurfaceViewRenderer) {
+        this.playerView = playerView
+    }
+
+    fun setCallContext(callContext: CallContext) {
+        this.callContext = callContext
     }
 
     private fun initRTC() {
-        val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
-        rtcConfig.apply {
-            enableCpuOveruseDetection = false
-            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
-            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_ONCE
-        }
+        Utils.checkIsOnMainThread()
+        execute {
+            val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
+            rtcConfig.apply {
+                enableCpuOveruseDetection = false
+                sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+                continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_ONCE
+            }
 
-        rtcConfig.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
-
-        netWorkPlayerView?.init(eglBaseContext, null)
-
-        if (isIncomingCall.not()) {
-            peerConnection = peerConnectionFactory.createPeerConnection(
-                rtcConfig, object : DefaultObserver() {
-                    override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
-                        super.onIceGatheringChange(iceGatheringState)
-                        if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
-                            createOutgoingCall(peerConnection.localDescription.description)
-                        }
-                    }
-                }
-            )?.apply {
-                addTransceiver(
-                    MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-                    RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_ONLY)
-                )
-                addTransceiver(
-                    MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-                    RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_ONLY)
-                )
-            }!!
-        } else {
-            peerConnection = peerConnectionFactory.createPeerConnection(
-                rtcConfig,
-                object : DefaultObserver() {
-                    override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
-                        super.onIceGatheringChange(iceGatheringState)
-                        if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
-                            val obj = JSONObject()
-                            obj.put("action", "connected")
-                            obj.put("answer", peerConnection.localDescription.description)
-                            commSocket?.let {
-                                val pw = PacketWriter(it)
-                                pw.writeMessage(obj.toString().toByteArray())
-                                closeSocket(it)
+            if (isIncomingCall.not()) {
+                peerConnection = peerConnectionFactory.createPeerConnection(
+                    rtcConfig, object : DefaultObserver() {
+                        override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
+                            super.onIceGatheringChange(iceGatheringState)
+                            if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
+                                createOutgoingCall(peerConnection.localDescription.description)
                             }
                         }
-                    }
 
-                    override fun onAddStream(mediaStream: MediaStream) {
-                        super.onAddStream(mediaStream)
-                        mediaStream.let {
-                            if (it.videoTracks.isNotEmpty()) {
-                                it.videoTracks.first().addSink(netWorkPlayerView)
+                        override fun onDataChannel(dataChannel: DataChannel) {
+                            super.onDataChannel(dataChannel)
+                            this@WebRTCClient.dataChannel = dataChannel
+                            this@WebRTCClient.dataChannel!!.registerObserver(dataChannelObserver)
+                        }
+
+                        override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState) {
+                            super.onIceConnectionChange(iceConnectionState)
+                            when (iceConnectionState) {
+                                PeerConnection.IceConnectionState.CONNECTED,
+                                PeerConnection.IceConnectionState.FAILED,
+                                PeerConnection.IceConnectionState.DISCONNECTED -> {
+//                                    closeSocket(commSocket)
+                                }
+                                else -> return
                             }
                         }
+
+                        override fun onIceCandidate(iceCandidate: IceCandidate) {
+                            super.onIceCandidate(iceCandidate)
+//                            val obj = JSONObject()
+//                            obj.put("action", "iceCandidate")
+//                            obj.put("sdpMid", iceCandidate.sdpMid)
+//                            obj.put("sdpMLineIndex", iceCandidate.sdpMLineIndex)
+//                            obj.put("sdp", iceCandidate.sdp)
+//                            closeSocket(sendIceCandidate(ice = obj.toString()))
+                            Log.d(this, "onIceCandidate ------> : $iceCandidate")
+                        }
                     }
-
-                })?.apply {
-                addTransceiver(
-                    MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-                    RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-                )
-                addTransceiver(
-                    MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-                    RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-                )
-            }!!
-        }
-
-
-        if (!isIncomingCall) {
-            videoTrack.setEnabled(true)
-            audioTrack.setEnabled(true)
-            peerConnection.addTrack(videoTrack)
-            peerConnection.addTrack(audioTrack)
-
-            localPlayerView?.setMirror(true)
-            localPlayerView?.init(eglBaseContext, null)
-            videoTrack.addSink(localPlayerView)
-
-            peerConnection.createOffer(object : DefaultSdpObserver() {
-                override fun onCreateSuccess(sessionDescription: SessionDescription) {
-                    super.onCreateSuccess(sessionDescription)
-                    peerConnection.setLocalDescription(DefaultSdpObserver(), sessionDescription)
-                }
-            }, sdpMediaConstraints)
-        } else {
-            peerConnection.setRemoteDescription(object : DefaultSdpObserver() {
-
-                override fun onSetSuccess() {
-                    super.onSetSuccess()
-                    peerConnection.createAnswer(object : DefaultSdpObserver() {
-                        override fun onCreateSuccess(sessionDescription: SessionDescription) {
-                            super.onCreateSuccess(sessionDescription)
-                            peerConnection.setLocalDescription(DefaultSdpObserver(), sessionDescription)
+                )!!
+            } else {
+                peerConnection = peerConnectionFactory.createPeerConnection(
+                    rtcConfig,
+                    object : DefaultObserver() {
+                        override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
+                            super.onIceGatheringChange(iceGatheringState)
+                            if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
+                                val obj = JSONObject()
+                                obj.put("action", "connected")
+                                obj.put("answer", peerConnection.localDescription.description)
+                                commSocket?.let {
+                                    val pw = PacketWriter(it)
+                                    pw.writeMessage(obj.toString().toByteArray())
+                                } ?: Log.d(this, "Dio------> binder null")
+                            }
                         }
 
-                    }, sdpMediaConstraints)
-                }
+                        override fun onAddStream(mediaStream: MediaStream) {
+                            super.onAddStream(mediaStream)
+                            mediaStream.let {
+                                if (it.videoTracks.isNotEmpty()) {
+                                    Log.d(
+                                        this,
+                                        "onAddStream() -----> :" + it.videoTracks.first().toString()
+                                    )
+                                    it.videoTracks.first().addSink(proxyVideoSink)
+                                }
+                            }
+                        }
 
-            }, SessionDescription(SessionDescription.Type.OFFER, offer))
+                        override fun onIceCandidate(iceCandidate: IceCandidate) {
+                            super.onIceCandidate(iceCandidate)
+                            Log.d(this, "onIceCandidate ------> : $iceCandidate")
+                        }
+
+                        override fun onDataChannel(dataChannel: DataChannel) {
+                            super.onDataChannel(dataChannel)
+                            this@WebRTCClient.dataChannel = dataChannel
+                            this@WebRTCClient.dataChannel!!.registerObserver(dataChannelObserver)
+                        }
+                    })!!
+            }
+
+            if (isIncomingCall.not()) {
+//                videoTrack.setEnabled(true)
+//                audioTrack.setEnabled(true)
+//                peerConnection.addTrack(videoTrack)
+//                peerConnection.addTrack(audioTrack)
+
+                playerView?.setMirror(true)
+                videoTrack.addSink(proxyVideoSink)
+
+                val init = DataChannel.Init()
+                init.ordered = true
+                dataChannel = peerConnection.createDataChannel("data", init)
+                dataChannel!!.registerObserver(dataChannelObserver)
+                peerConnection.createOffer(object : DefaultSdpObserver() {
+                    override fun onCreateSuccess(sessionDescription: SessionDescription) {
+                        super.onCreateSuccess(sessionDescription)
+                        peerConnection.setLocalDescription(DefaultSdpObserver(), sessionDescription)
+                    }
+                }, sdpMediaConstraints)
+
+
+
+            } else {
+                peerConnection.setRemoteDescription(object : DefaultSdpObserver() {
+                    override fun onSetSuccess() {
+                        super.onSetSuccess()
+                        peerConnection.createAnswer(object : DefaultSdpObserver() {
+                            override fun onCreateSuccess(sessionDescription: SessionDescription) {
+                                super.onCreateSuccess(sessionDescription)
+                                peerConnection.setLocalDescription(
+                                    DefaultSdpObserver(),
+                                    sessionDescription
+                                )
+                            }
+                        }, sdpMediaConstraints)
+                    }
+
+                }, SessionDescription(SessionDescription.Type.OFFER, offer))
+            }
         }
     }
 
-    private fun connectRTC(desc: String) {
-        if (isIncomingCall) {
-
-        } else {
-
+    fun setCameraEnabled(enabled: Boolean) {
+        Utils.checkIsOnMainThread()
+        execute {
+            videoTrack.setEnabled(enabled)
+            audioTrack.setEnabled(enabled)
+            if (enabled) {
+                peerConnection.addTrack(videoTrack)
+                peerConnection.addTrack(audioTrack)
+            }
         }
+    }
+
+    class ProxyVideoSink : VideoSink {
+        private var target: VideoSink? = null
+
+        @Synchronized
+        override fun onFrame(frame: VideoFrame) {
+            val target = this.target
+
+            if (target == null) {
+                Log.d(this, "Dropping frame in proxy because target is null.")
+            } else {
+                target.onFrame(frame)
+            }
+        }
+
+        @Synchronized
+        fun setTarget(target: VideoSink?) {
+            this.target = target
+        }
+    }
+
+    val dataChannelObserver = object : DataChannel.Observer {
+        override fun onBufferedAmountChange(p0: Long) {}
+
+        override fun onStateChange() {
+            val channel = dataChannel
+            if (channel == null) {
+                Log.d(this, "onStateChange dataChannel: is null")
+            } else {
+                Log.d(this, "onStateChange dataChannel: ${channel.state()}")
+                if (channel.state() == DataChannel.State.OPEN) {
+
+                }
+            }
+        }
+
+        override fun onMessage(buffer: DataChannel.Buffer) {
+            val data = ByteArray(buffer.data.remaining())
+            buffer.data.get(data)
+            val s = String(data)
+            try {
+                Log.d(this, "DataChannel onMessage() message: $s")
+                callContext?.onDataChannelCallback(s)
+            } catch (e: JSONException) {
+                e.printStackTrace()
+            }
+        }
+
+    }
+
+    fun sendOnDataChannel(message: String): Boolean {
+        val channel = dataChannel
+        if (channel == null) {
+            Log.w(this, "setCameraEnabled() dataChannel not set => ignore")
+            return false
+        }
+
+        if (channel.state() != DataChannel.State.OPEN) {
+            Log.w(this, "setCameraEnabled() dataChannel not ready => ignore")
+            return false
+        }
+
+        try {
+            channel.send(
+                DataChannel.Buffer(
+                    ByteBuffer.wrap(
+                        message.toByteArray()
+                    ), false
+                )
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+
+        return true
     }
 
     private fun createAudioConstraints(): MediaConstraints? {
@@ -251,14 +394,14 @@ class WebRTCClient: SocketService {
     private fun setRemoteSdp(sdp: String) {
         peerConnection.let {
             val remoteSdp = SessionDescription(SessionDescription.Type.ANSWER, sdp)
-            peerConnection.setRemoteDescription(DefaultSdpObserver(), remoteSdp)
+            it.setRemoteDescription(DefaultSdpObserver(), remoteSdp)
         }
     }
 
     private fun getVideoTrack(): VideoTrack {
         videoCapture = createVideoCapture()!!
         videoSource = peerConnectionFactory.createVideoSource(videoCapture.isScreencast)
-        surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBaseContext)
+        surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBase.eglBaseContext)
         videoCapture.initialize(surfaceTextureHelper, contextMain, videoSource.capturerObserver)
         videoCapture.startCapture(640, 480, 30)
         videoTrack = peerConnectionFactory.createVideoTrack(VIDEO_TRACK_ID, videoSource)
@@ -302,14 +445,14 @@ class WebRTCClient: SocketService {
     }
 
     fun destroy() {
-        localPlayerView?.release()
-        netWorkPlayerView?.release()
+        playerView?.release()
         if (isIncomingCall) {
             videoCapture.dispose()
             videoTrack.dispose()
         }
         peerConnection.dispose()
         peerConnectionFactory.dispose()
+        cleanup()
     }
 
     fun cleanup() {
@@ -333,5 +476,17 @@ class WebRTCClient: SocketService {
         execute {
             setRemoteSdp(remoteDesc)
         }
+    }
+
+    override fun addIceCandidate(ice: String) {
+        val obj1 = JSONObject(ice)
+        Log.d(this, "addIceCandidate -----> : $ice")
+        val sdpMid = obj1.getString("sdpMid")
+        val sdpMLineIndex = obj1.getInt("sdpMLineIndex")
+        val sdp = obj1.getString("sdp")
+    }
+
+    interface CallContext {
+        fun onDataChannelCallback(message: String)
     }
 }

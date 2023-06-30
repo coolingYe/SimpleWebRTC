@@ -9,7 +9,9 @@ class WebRTCMain : Application() {
         super.onCreate()
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions
-                .builder(applicationContext).createInitializationOptions()
+                .builder(applicationContext)
+                .setEnableInternalTracer(true)
+                .createInitializationOptions()
         )
     }
 }

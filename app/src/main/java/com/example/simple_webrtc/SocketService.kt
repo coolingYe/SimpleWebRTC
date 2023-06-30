@@ -4,13 +4,15 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.os.Binder
 import android.os.Looper
 import com.example.simple_webrtc.rtc.WebRTCClient
-import com.example.simple_webrtc.utils.Constant
-import com.example.simple_webrtc.utils.Log
+import com.example.simple_webrtc.utils.*
 import com.example.simple_webrtc.utils.PacketReader
 import com.example.simple_webrtc.utils.PacketWriter
+import com.example.simple_webrtc.utils.Utils
 import org.json.JSONObject
+import org.webrtc.IceCandidate
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketAddress
@@ -24,6 +26,7 @@ abstract class SocketService(
     private val executor = Executors.newSingleThreadExecutor()
 
     abstract fun handleAnswer(remoteDesc: String)
+    abstract fun addIceCandidate(ice: String)
 
     protected fun cleanupRTCPeerConnection() {
         execute {
@@ -42,12 +45,31 @@ abstract class SocketService(
         executor.awaitTermination(4L, TimeUnit.SECONDS)
     }
 
+    fun sendIceCandidate(socket: Socket? = connectSocket(), ice: String): Socket? {
+        socket?.let {
+            val pw = PacketWriter(it)
+            pw.writeMessage(ice.toByteArray())
+            return it
+        }
+        return null
+    }
+
+    fun sendOnSocket(message: String) {
+        Thread {
+            commSocket?.let { socket ->
+                val pw = PacketWriter(socket)
+                pw.writeMessage(message.toByteArray())
+            }
+        }.start()
+    }
+
     fun createOutgoingCall(offer: String) {
         Log.d(this, "createOutgoingCall()")
         Thread {
             try {
                 createOutgoingCallInternal(offer)
             } catch (e: Exception) {
+                Log.d(this, "createOutgoingCall err ---> $e")
                 e.printStackTrace()
             }
         }.start()
@@ -65,7 +87,28 @@ abstract class SocketService(
             obj.put("offer", offer)
             pw.writeMessage(obj.toString().toByteArray())
 
-            while (!socket.isClosed) {
+            val response = pr.readMessage()
+            if (response == null) {
+                Thread.sleep(SOCKET_TIMEOUT_MS / 10)
+                Log.d(this, "createOutgoingCallInternal() response is null")
+                return
+            }
+            val message = String((response), Charsets.UTF_8)
+            val obj1 = JSONObject(message)
+            val action = obj1.getString("action")
+
+            Log.d(this, "createOutgoingCallInternal() ---> response : $message")
+            when (action) {
+                "connected" -> {
+                    val answer = obj1.getString("answer")
+                    handleAnswer(answer)
+                }
+                "iceCandidate" -> {
+                    addIceCandidate(message)
+                }
+            }
+
+            while (false) {
                 val response = pr.readMessage()
                 if (response == null) {
                     Thread.sleep(SOCKET_TIMEOUT_MS / 10)
@@ -80,8 +123,13 @@ abstract class SocketService(
                 if (action == "connected") {
                     val answer = obj1.getString("answer")
                     handleAnswer(answer)
+                    break
+                } else if (action == "iceCandidate") {
+                    addIceCandidate(message)
+                    break
                 }
             }
+//            closeSocket(socket)
         } ?: return
     }
 
@@ -121,6 +169,77 @@ abstract class SocketService(
         }
     }
 
+    fun createIncomingCall(binder: MainService.MainBinder, socket: Socket) {
+        Thread {
+            try {
+                createIncomingCallInternal(binder, socket)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                //decline()
+            }
+        }.start()
+    }
+
+    private fun createIncomingCallInternal(binder: MainService.MainBinder, socket: Socket) {
+        val pw = PacketWriter(socket)
+        val pr = PacketReader(socket)
+
+        val request = pr.readMessage()
+        if (request == null) {
+            Log.d(this, "createIncomingCallInternal() connection closed")
+            socket.close()
+            return
+        }
+
+        val message = String((request), Charsets.UTF_8)
+        val obj = JSONObject(message)
+        val action = obj.optString("action", "")
+        Log.d(this, "createOutgoingCallInternal() ---> response : $message")
+        when (action) {
+            "call" -> {
+                val offer = obj.getString("offer")
+                Log.d(this, "Dior: ------> $offer");
+
+                incomingRTCCall?.cleanup()
+                incomingRTCCall = WebRTCClient(binder, socket, offer)
+
+                try {
+                    Looper.prepare()
+                    val messageDialog = AlertDialog.Builder(contextMain)
+                    with(messageDialog) {
+                        setTitle("Call Incoming")
+                        setMessage("Do you agree to accept?")
+                        setPositiveButton("Accept") { dialog, _ ->
+                            run {
+                                val intent = Intent(contextMain, MainActivity::class.java)
+                                intent.putExtra("EXTRA_TYPE", "Incoming")
+                                contextMain?.startActivity(intent)
+                                dialog.dismiss()
+                            }
+                        }
+                        setNegativeButton("Cancel") { dialog, _ ->
+                            run {
+                                dialog.dismiss()
+                            }
+                        }
+                    }
+                    messageDialog.show()
+                    Looper.loop()
+                } catch (e: Exception) {
+                    incomingRTCCall?.cleanup()
+                    incomingRTCCall = null
+                    e.printStackTrace()
+                }
+            }
+            "iceCandidate" -> {
+                addIceCandidate(message)
+            }
+            else -> {
+                Log.d(this, "createIncomingCallInternal(): ------> $action");
+            }
+        }
+    }
+
     companion object {
         private const val SOCKET_TIMEOUT_MS = 3000L
 
@@ -141,77 +260,6 @@ abstract class SocketService(
                 socket?.close()
             } catch (e: Exception) {
                 e.printStackTrace()
-            }
-        }
-
-        fun createIncomingCall(socket: Socket) {
-            Thread {
-                try {
-                    createIncomingCallInternal(socket)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    //decline()
-                }
-            }.start()
-        }
-
-        private fun createIncomingCallInternal(socket: Socket) {
-            val pw = PacketWriter(socket)
-            val pr = PacketReader(socket)
-
-            val request = pr.readMessage()
-            if (request == null) {
-                Log.d(this, "createIncomingCallInternal() connection closed")
-                socket.close()
-                return
-            }
-
-            val message = String((request), Charsets.UTF_8)
-            val obj = JSONObject(message)
-            val action = obj.optString("action", "")
-            Log.d(this, "createIncomingCallInternal() action: $action")
-            when (action) {
-                "call" -> {
-//                    val callback = "{\"action\":\"ringing\"}"
-//                    pw.writeMessage(callback.toByteArray(Charsets.UTF_8))
-
-                    val offer = obj.getString("offer")
-                    Log.d(this, "Dior: ------> $offer");
-
-                    incomingRTCCall?.cleanup()
-                    incomingRTCCall = WebRTCClient(socket, offer)
-
-                    try {
-                        Looper.prepare()
-                        val messageDialog = AlertDialog.Builder(contextMain)
-                        with(messageDialog) {
-                            setTitle("Call Incoming")
-                            setMessage("Do you agree to accept?")
-                            setPositiveButton("Accept") { dialog, _ ->
-                                run {
-                                    val intent = Intent(contextMain, MainActivity::class.java)
-                                    intent.putExtra("EXTRA_TYPE", "Incoming")
-                                    contextMain?.startActivity(intent)
-                                    dialog.dismiss()
-                                }
-                            }
-                            setNegativeButton("Cancel") { dialog, _ ->
-                                run {
-                                    dialog.dismiss()
-                                }
-                            }
-                        }
-                        messageDialog.show()
-                        Looper.loop()
-                    } catch (e: Exception) {
-                        incomingRTCCall?.cleanup()
-                        incomingRTCCall = null
-                        e.printStackTrace()
-                    }
-                }
-                else -> {
-                    Log.d(this, "createIncomingCallInternal(): ------> $action");
-                }
             }
         }
     }
