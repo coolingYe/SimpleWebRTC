@@ -7,8 +7,6 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.widget.Toast
-import androidx.core.content.ContextCompat
-import com.example.simple_webrtc.rtc.WebRTCClient
 import com.example.simple_webrtc.utils.Constant
 import com.example.simple_webrtc.utils.Log
 import java.io.IOException
@@ -35,16 +33,18 @@ class MainService : Service(), Runnable {
 
     override fun run() {
         try {
-            serverSocket = ServerSocket(Constant.SERVER_HTTP_PORT)
+            serverSocket = ServerSocket(7653)
             while (isServerSocketRunning) {
                 try {
-                    socket = serverSocket!!.accept()
-                    socket?.let {
-                        WebRTCClient().createIncomingCall(binder, it)
+                    serverSocket?.let { server ->
+                        socket = server.accept()
+                        socket?.let { socket ->
+                            Log.d(this, "MainService new incoming connection")
+                            SocketService.createIncomingCall(binder, socket)
+                        }
                     }
-                    Log.d(this, "MainService new incoming connection")
                 } catch (e: IOException) {
-                    // ignore
+                    Log.d(this, "serverSocket open ----->e$e")
                 }
             }
         } catch (e: IOException) {

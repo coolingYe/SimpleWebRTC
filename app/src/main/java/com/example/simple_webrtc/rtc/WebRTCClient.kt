@@ -1,7 +1,11 @@
 package com.example.simple_webrtc.rtc
 
+import com.example.gesturelib.Camera2Listener
 import com.example.simple_webrtc.MainService
 import com.example.simple_webrtc.SocketService
+import com.example.simple_webrtc.model.Contact
+import com.example.simple_webrtc.utils.BitmapUtil.NV21ToBitmap
+import com.example.simple_webrtc.utils.BitmapUtil.createNV21Data
 import com.example.simple_webrtc.utils.Log
 import com.example.simple_webrtc.utils.PacketWriter
 import com.example.simple_webrtc.utils.Utils
@@ -13,7 +17,6 @@ import java.net.NetworkInterface
 import java.net.Socket
 import java.net.SocketException
 import java.nio.ByteBuffer
-
 
 class WebRTCClient : SocketService {
     private lateinit var peerConnection: PeerConnection
@@ -39,6 +42,7 @@ class WebRTCClient : SocketService {
     private var callContext: CallContext? = null
 
     private var binder: MainService.MainBinder? = null
+    private var contact: Contact ?= null
 
     constructor(
         binder: MainService.MainBinder,
@@ -46,12 +50,15 @@ class WebRTCClient : SocketService {
         offer: String
     ) : super(commSocket) {
         this.binder = binder
+        this.contact = contact
         Log.d(this, "RTCCall() created for incoming calls")
         this.offer = offer
     }
 
     constructor(
+        contact: Contact
     ) : super(null) {
+        this.contact = contact
         Log.d(this, "RTCCall() created for outgoing calls")
     }
 
@@ -133,7 +140,7 @@ class WebRTCClient : SocketService {
                         override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
                             super.onIceGatheringChange(iceGatheringState)
                             if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
-                                createOutgoingCall(peerConnection.localDescription.description)
+                                createOutgoingCall(contact!!, peerConnection.localDescription.description)
                             }
                         }
 
@@ -149,7 +156,7 @@ class WebRTCClient : SocketService {
                                 PeerConnection.IceConnectionState.CONNECTED,
                                 PeerConnection.IceConnectionState.FAILED,
                                 PeerConnection.IceConnectionState.DISCONNECTED -> {
-//                                    closeSocket(commSocket)
+                                    closeSocket(commSocket)
                                 }
                                 else -> return
                             }
@@ -157,12 +164,6 @@ class WebRTCClient : SocketService {
 
                         override fun onIceCandidate(iceCandidate: IceCandidate) {
                             super.onIceCandidate(iceCandidate)
-//                            val obj = JSONObject()
-//                            obj.put("action", "iceCandidate")
-//                            obj.put("sdpMid", iceCandidate.sdpMid)
-//                            obj.put("sdpMLineIndex", iceCandidate.sdpMLineIndex)
-//                            obj.put("sdp", iceCandidate.sdp)
-//                            closeSocket(sendIceCandidate(ice = obj.toString()))
                             Log.d(this, "onIceCandidate ------> : $iceCandidate")
                         }
                     }
@@ -184,15 +185,18 @@ class WebRTCClient : SocketService {
                             }
                         }
 
-                        override fun onAddStream(mediaStream: MediaStream) {
-                            super.onAddStream(mediaStream)
-                            mediaStream.let {
-                                if (it.videoTracks.isNotEmpty()) {
-                                    Log.d(
-                                        this,
-                                        "onAddStream() -----> :" + it.videoTracks.first().toString()
-                                    )
-                                    it.videoTracks.first().addSink(proxyVideoSink)
+                        override fun onAddTrack(
+                            rtpReceiver: RtpReceiver,
+                            mediaStreams: Array<MediaStream>
+                        ) {
+                            super.onAddTrack(rtpReceiver, mediaStreams)
+                            val track = rtpReceiver.track()
+                            if (track is VideoTrack) {
+                                track.setEnabled(true)
+                                track.addSink { p0 ->
+                                    if (p0 != null) {
+                                        proxyVideoSink.onFrame(p0)
+                                    }
                                 }
                             }
                         }
@@ -211,13 +215,13 @@ class WebRTCClient : SocketService {
             }
 
             if (isIncomingCall.not()) {
-//                videoTrack.setEnabled(true)
-//                audioTrack.setEnabled(true)
-//                peerConnection.addTrack(videoTrack)
-//                peerConnection.addTrack(audioTrack)
+                videoTrack.setEnabled(true)
+                audioTrack.setEnabled(true)
+                peerConnection.addTrack(videoTrack)
+                peerConnection.addTrack(audioTrack)
 
                 playerView?.setMirror(true)
-                videoTrack.addSink(proxyVideoSink)
+                videoTrack.addSink(playerView)
 
                 val init = DataChannel.Init()
                 init.ordered = true
@@ -229,8 +233,6 @@ class WebRTCClient : SocketService {
                         peerConnection.setLocalDescription(DefaultSdpObserver(), sessionDescription)
                     }
                 }, sdpMediaConstraints)
-
-
 
             } else {
                 peerConnection.setRemoteDescription(object : DefaultSdpObserver() {
@@ -252,20 +254,9 @@ class WebRTCClient : SocketService {
         }
     }
 
-    fun setCameraEnabled(enabled: Boolean) {
-        Utils.checkIsOnMainThread()
-        execute {
-            videoTrack.setEnabled(enabled)
-            audioTrack.setEnabled(enabled)
-            if (enabled) {
-                peerConnection.addTrack(videoTrack)
-                peerConnection.addTrack(audioTrack)
-            }
-        }
-    }
-
     class ProxyVideoSink : VideoSink {
         private var target: VideoSink? = null
+        private var camera2Listener: Camera2Listener? = null
 
         @Synchronized
         override fun onFrame(frame: VideoFrame) {
@@ -275,12 +266,18 @@ class WebRTCClient : SocketService {
                 Log.d(this, "Dropping frame in proxy because target is null.")
             } else {
                 target.onFrame(frame)
+                camera2Listener?.method(NV21ToBitmap(contextMain, createNV21Data(frame.buffer.toI420()), frame.buffer.width, frame.buffer.height))
             }
         }
 
         @Synchronized
         fun setTarget(target: VideoSink?) {
             this.target = target
+        }
+
+        @Synchronized
+        fun setCameraCallback(camera2Listener: Camera2Listener) {
+            this.camera2Listener = camera2Listener
         }
     }
 
@@ -294,7 +291,7 @@ class WebRTCClient : SocketService {
             } else {
                 Log.d(this, "onStateChange dataChannel: ${channel.state()}")
                 if (channel.state() == DataChannel.State.OPEN) {
-
+                    Log.d(this, "onStateChange dataChannel: Ready")
                 }
             }
         }
@@ -476,14 +473,6 @@ class WebRTCClient : SocketService {
         execute {
             setRemoteSdp(remoteDesc)
         }
-    }
-
-    override fun addIceCandidate(ice: String) {
-        val obj1 = JSONObject(ice)
-        Log.d(this, "addIceCandidate -----> : $ice")
-        val sdpMid = obj1.getString("sdpMid")
-        val sdpMLineIndex = obj1.getInt("sdpMLineIndex")
-        val sdp = obj1.getString("sdp")
     }
 
     interface CallContext {

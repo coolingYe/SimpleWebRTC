@@ -9,22 +9,60 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9ba38541-78ad-4783-894b-f8d942faee88" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/Utils.kt" afterDir="false" />
+    <list default="true" id="9ba38541-78ad-4783-894b-f8d942faee88" name="Changes" comment="Test.">
+      <change afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/deploymentTargetDropDown.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/build.gradle" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/consumer-rules.pro" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/libs/zeepose-rknn-rk3588-v1.2.2-release.aar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/proguard-rules.pro" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/androidTest/java/com/example/gesturelib/ExampleInstrumentedTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/AndroidManifest.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/Camera2Listener.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/CommonUtils.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/Config.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/GestureManager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/LocationEnum.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/OverlayView.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/StateMode.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/main/java/com/example/gesturelib/ZeePoseWrapper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GestureLib/src/test/java/com/example/gesturelib/ExampleUnitTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/CallActivity.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/ContactAdapter.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/QRScanActivity.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/model/Contact.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/BitmapUtil.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/cache/AppGlobals.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/cache/SPUtils.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/cache/SharePrefer.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_call.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_qrscan.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/res/layout/dialog_qr.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/res/layout/list_item_contact_plan.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/MainActivity.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/MainService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/MainService.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/SocketService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/SocketService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/WebRTCMain.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/WebRTCMain.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/rtc/WebRTCClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/rtc/WebRTCClient.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/Constant.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/Constant.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/Utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils/Utils.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable/shape_rectangle_white.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable/shape_rectangle_white.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/menu/menu_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/menu/menu_main.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[1111020123020150]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[7213c7ab]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -47,6 +85,16 @@
       </state>
     </system>
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+        <option value="Kotlin Data Class" />
+        <option value="Kotlin Class" />
+        <option value="layoutResourceFile" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -59,22 +107,43 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;DEBUGGABLE_DEVICE&quot;: &quot;xiaomi-23013rk75c-7213c7ab&quot;,
-    &quot;DEBUGGABLE_PROCESS&quot;: &quot;com.example.webrtc_p2p&quot;,
-    &quot;DEBUGGER_ID&quot;: &quot;Auto&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;SHOW_ALL_PROCESSES&quot;: &quot;false&quot;,
-    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/media/zeewain-ywk/Storage/AndroidStudioProjects/other/meshenger-android&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "DEBUGGABLE_DEVICE": "xiaomi-23013rk75c-7213c7ab",
+    "DEBUGGABLE_PROCESS": "com.example.webrtc_p2p",
+    "DEBUGGER_ID": "Auto",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "SHOW_ALL_PROCESSES": "false",
+    "android-custom-view/home/zeewain-ywk/.gradle/caches/modules-2/files-2.1/com.journeyapps/zxing-android-embedded/3.6.0/32f275c483fab0ce2b99b4c12b0c45cf0516a294/zxing-android-embedded-3.6.0-sources.jar!/com/journeyapps/barcodescanner/DecoratedBarcodeView.java_SELECTED": "DecoratedBarcodeView",
+    "android-custom-view/home/zeewain-ywk/Android/Sdk/sources/android-33/android/view/SurfaceView.java_SELECTED": "SurfaceView",
+    "android-custom-view/home/zeewain-ywk/Android/Sdk/sources/android-33/android/widget/ImageView.java_SELECTED": "ImageView",
+    "android-custom-view/media/zeewain-ywk/Storage/AndroidStudioProjects/SimpleWebRTC/GestureLib/src/main/java/com/example/gesturelib/OverlayView.java_SELECTED": "OverlayView",
+    "cidr.known.project.marker": "true",
+    "com.google.services.firebase.aqiPopupShown": "true",
+    "last_opened_file_path": "/media/zeewain-ywk/Storage/AndroidStudioProjects/zeesetting",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.17",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "settings.codegpt"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/app/src/main/res/layout" />
+      <recent name="$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/utils" />
+      <recent name="$PROJECT_DIR$/GestureLib/libs" />
+    </key>
     <key name="CopyKotlinDeclarationDialog.RECENTS_KEY">
+      <recent name="com.example.simple_webrtc" />
       <recent name="com.example.simple_webrtc.utils" />
+    </key>
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.example.simple_webrtc.utils" />
+      <recent name="com.example.gesturelib" />
+      <recent name="com.example.simple_webrtc" />
     </key>
   </component>
   <component name="RunManager">
@@ -146,6 +215,14 @@
       <option name="presentableId" value="Default" />
       <updated>1688003193320</updated>
     </task>
+    <task id="LOCAL-00001" summary="Test.">
+      <created>1688120148373</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1688120148373</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -159,28 +236,27 @@
       </map>
     </option>
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Test." />
+    <option name="LAST_COMMIT_MESSAGE" value="Test." />
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/rtc/WebRTCClient.kt</url>
-          <line>178</line>
-          <option name="timeStamp" value="17" />
+          <url>file://$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/MainActivity.kt</url>
+          <line>100</line>
+          <option name="timeStamp" value="28" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/SocketService.kt</url>
-          <line>101</line>
-          <option name="timeStamp" value="21" />
+          <line>121</line>
+          <option name="timeStamp" value="29" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/SocketService.kt</url>
-          <line>196</line>
-          <option name="timeStamp" value="23" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/com/example/simple_webrtc/SocketService.kt</url>
-          <line>187</line>
-          <option name="timeStamp" value="26" />
+          <line>183</line>
+          <option name="timeStamp" value="32" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

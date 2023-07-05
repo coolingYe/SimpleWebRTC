@@ -3,63 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".MainActivity"
-    android:animateLayoutChanges="true">
+    android:layout_height="match_parent">
 
-    <org.webrtc.SurfaceViewRenderer
-        android:id="@+id/video_player"
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <Button
-        android:id="@+id/btnCall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="50dp"
+        android:background="?attr/colorPrimary"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="10dp"
-        android:textSize="20sp"
-        android:text="call"/>
+        app:popupTheme="@style/Theme.WebRTCP2P.PopupOverlay" />
 
-    <Button
-        android:id="@+id/btnCamera"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/btnCall"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="10dp"
-        android:textSize="20sp"
-        android:text="Camera"/>
-
-    <Button
-        android:id="@+id/btnDataChannelSend"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/btnCamera"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="10dp"
-        android:textSize="20sp"
-        android:text="DataChannel_Send"/>
-
-    <Button
-        android:id="@+id/btnSocketSend"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/btnDataChannelSend"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="10dp"
-        android:textSize="20sp"
-        android:text="Socket_Send"/>
-
-    <Button
-        android:id="@+id/btnRelease"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/btnSocketSend"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="10dp"
-        android:textSize="20sp"
-        android:text="release"/>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_contacts"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            app:layout_constraintBottom_toBottomOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

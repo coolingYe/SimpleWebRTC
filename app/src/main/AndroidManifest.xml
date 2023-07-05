@@ -32,6 +32,12 @@
         <service
             android:name=".MainService"
             android:exported="false" />
+
+        <activity
+            android:name=".QRScanActivity" />
+
+        <activity
+            android:name=".CallActivity" />
     </application>
 
 </manifest>

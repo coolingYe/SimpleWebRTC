@@ -2,12 +2,29 @@ package com.example.simple_webrtc.utils
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.net.Uri
+import android.opengl.GLES20
 import android.os.Looper
 import android.provider.OpenableColumns
+import android.view.SurfaceView
 import androidx.core.content.ContextCompat
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
+import com.journeyapps.barcodescanner.BarcodeEncoder
+import org.webrtc.*
+import org.webrtc.RendererCommon.GlDrawer
 import java.io.*
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.net.SocketException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.*
 import java.util.regex.Pattern
+
 
 internal object Utils {
     fun getThreadInfo(): String {
@@ -170,4 +187,37 @@ internal object Utils {
         fis.close()
         return buffer.toByteArray()
     }
+
+    fun getIpAddressString(): String? {
+        try {
+            val enNetI = NetworkInterface
+                .getNetworkInterfaces()
+            while (enNetI.hasMoreElements()) {
+                val netI = enNetI.nextElement()
+                val enumIpAddr = netI
+                    .inetAddresses
+                while (enumIpAddr.hasMoreElements()) {
+                    val inetAddress = enumIpAddr.nextElement()
+                    if (inetAddress is Inet4Address && !inetAddress.isLoopbackAddress()) {
+                        return inetAddress.getHostAddress()
+                    }
+                }
+            }
+        } catch (e: SocketException) {
+            e.printStackTrace()
+        }
+        return "0.0.0.0"
+    }
+
+    fun getQRCode(content: String): Bitmap {
+        val multiFormatWriter = MultiFormatWriter()
+        val hints = Hashtable<EncodeHintType, Any>()
+        //设置空白边距的宽度
+        hints[EncodeHintType.MARGIN] = 0
+        val bitMatrix =
+            multiFormatWriter.encode(content, BarcodeFormat.QR_CODE, 250, 250, hints)
+        val barcodeEncoder = BarcodeEncoder()
+        return barcodeEncoder.createBitmap(bitMatrix)
+    }
+
 }
