@@ -9,30 +9,21 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.IBinder
 import android.view.*
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.RecyclerView.LayoutManager
-import com.example.gesturelib.Config
-import com.example.gesturelib.GestureManager
-import com.example.gesturelib.LocationEnum
 import com.example.simple_webrtc.databinding.ActivityMainBinding
 import com.example.simple_webrtc.model.Contact
-import com.example.simple_webrtc.rtc.WebRTCClient
-import com.example.simple_webrtc.utils.Constant
 import com.example.simple_webrtc.utils.Constant.SERVICE_IP_LIST
 import com.example.simple_webrtc.utils.Log
-import com.example.simple_webrtc.utils.Utils.getIpAddressString
 import com.example.simple_webrtc.utils.Utils.getQRCode
 import com.example.simple_webrtc.utils.cache.SPUtils
-import org.webrtc.EglBase
+import org.json.JSONObject
 import pub.devrel.easypermissions.EasyPermissions
-
 
 class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
 
@@ -70,37 +61,112 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
     private fun initViews() {
         binding.rvContacts.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
 
-        intentActivityResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            run {
-                if (it.resultCode == RESULT_OK) {
-                    it.data?.getStringExtra("QRResult")?.let {
-                        updateList()
+        intentActivityResult =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                run {
+                    if (it.resultCode == RESULT_OK) {
+                        it.data?.getStringExtra("QRResult")?.let {
+                            updateList()
+                        }
                     }
                 }
             }
-        }
-
-        val contactSet = SPUtils.getInstance().getStringSet(SERVICE_IP_LIST)
-        if (contactSet.size > 0) {
-            val dataList = ArrayList(contactSet)
-            contactAdapter = ContactAdapter(dataList)
-            contactAdapter?.setOnClickListener = object : (View, String) -> Unit {
-                override fun invoke(p1: View, p2: String) {
+        contactAdapter = ContactAdapter(emptyList())
+        getContactList().let { contacts ->
+            contactAdapter?.setOnClickListener = object : (View, Contact) -> Unit {
+                override fun invoke(p1: View, p2: Contact) {
                     val intent = Intent(this@MainActivity, CallActivity::class.java)
                     intent.action = CallActivity.ACTION_OUTGOING_CALL
-                    intent.putExtra(CallActivity.EXTRA_CONTACT, Contact("", p2))
+                    intent.putExtra(CallActivity.EXTRA_CONTACT, p2)
                     startActivity(intent)
                 }
             }
+            contactAdapter?.setOnLongClickListener = object : (View, Contact) -> Unit {
+                override fun invoke(p1: View, p2: Contact) {
+                    val popupMenu = PopupMenu(this@MainActivity, p1)
+                    popupMenu.menuInflater.inflate(R.menu.menu_item, popupMenu.menu)
+                    popupMenu.show()
+                    popupMenu.setOnMenuItemClickListener { item ->
+                        when (item.itemId) {
+                            R.id.action_edit -> {
+                                showEditDialog(p2)
+                            }
+                            R.id.action_delete -> {
+                                val targetContact = p2.name + "," + p2.ipAddress
+                                delContact(targetContact)
+                                contactAdapter?.updateList(getContactList())
+                            }
+                        }
+                        true
+                    }
+                }
+            }
             binding.rvContacts.adapter = contactAdapter
+            contactAdapter?.updateList(contacts)
         }
+    }
 
+    private fun addContact(targetContact: String) {
+        val contactSet = HashSet<String>()
+        contactSet.addAll(SPUtils.getInstance().getStringSet(SERVICE_IP_LIST))
+        contactSet.add(targetContact)
+        SPUtils.getInstance().put(SERVICE_IP_LIST, contactSet)
+    }
+
+    fun delContact(targetContact: String) {
+        val contactSet = HashSet<String>()
+        contactSet.addAll(SPUtils.getInstance().getStringSet(SERVICE_IP_LIST))
+        if (contactSet.size > 0) {
+            contactSet.remove(targetContact)
+            SPUtils.getInstance().put(SERVICE_IP_LIST, contactSet)
+        }
+    }
+
+    fun showEditDialog(contact: Contact) {
+        val view = View.inflate(this@MainActivity, R.layout.dialog_contact_edit, null)
+        val editName = view.findViewById<EditText>(R.id.ed_contact_name)
+        val editIp = view.findViewById<EditText>(R.id.ed_contact_ip)
+        editName.setText(contact.name)
+        editIp.setText(contact.ipAddress)
+        AlertDialog.Builder(this).apply {
+            setTitle("Edit Contact")
+            setView(view)
+            setNegativeButton("Cancel", null)
+            setPositiveButton("OK") { dialog, _ ->
+                run {
+                    val targetContact = editName.text.toString() + "," + editIp.text
+                    val oldContact = contact.name + "," + contact.ipAddress
+                    delContact(oldContact)
+                    addContact(targetContact)
+                    contactAdapter?.updateList(getContactList())
+                    dialog.cancel()
+                }
+            }
+            show()
+        }
+    }
+
+    private fun getContactList(): List<Contact> {
+        val contactSet = SPUtils.getInstance().getStringSet(SERVICE_IP_LIST)
+        if (contactSet.size > 0) {
+            val dataList = ArrayList<Contact>()
+            contactSet.forEach {
+                val contact = Contact(it.substringBefore(","), it.substringAfter(","))
+                dataList.add(contact)
+            }
+            return dataList
+        }
+        return emptyList()
     }
 
     private fun updateList() {
         val contactSet = SPUtils.getInstance().getStringSet(SERVICE_IP_LIST)
         if (contactSet.size > 0) {
-            val dataList = ArrayList(contactSet)
+            val dataList = ArrayList<Contact>()
+            contactSet.forEach {
+                val contact = Contact(it.substringBefore(","), it.substringAfter(","))
+                dataList.add(contact)
+            }
             contactAdapter?.updateList(dataList)
         }
     }
@@ -122,11 +188,14 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
                 true
             }
             R.id.action_qr -> {
-                val ipv4Address = getIpAddressString()
-                ipv4Address?.let { ip ->
-                    if (ip.isNotEmpty()) {
-                        showQrDialog(getQRCode(ip))
+                val contact = binder?.getContact()
+                contact?.let {
+                    val json = JSONObject().apply {
+                        put("name", contact.name)
+                        put("ipAddress", contact.ipAddress)
                     }
+
+                    showQrDialog(getQRCode(json.toString()))
                 }
                 true
             }
@@ -177,11 +246,7 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
 
         qrDialog.show()
         val ivQr = view.findViewById<ImageView>(R.id.iv_qr)
-        val btnCancel = view.findViewById<Button>(R.id.btn_cancel)
         ivQr.setImageBitmap(bitmap)
-        btnCancel.setOnClickListener {
-            qrDialog.dismiss()
-        }
     }
 
 }

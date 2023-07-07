@@ -3,32 +3,27 @@ package com.example.simple_webrtc.utils
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.net.Uri
-import android.opengl.GLES20
+import android.os.Build
 import android.os.Looper
 import android.provider.OpenableColumns
-import android.view.SurfaceView
 import androidx.core.content.ContextCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import org.webrtc.*
-import org.webrtc.RendererCommon.GlDrawer
 import java.io.*
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.SocketException
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.*
 import java.util.regex.Pattern
 
 
 internal object Utils {
     fun getThreadInfo(): String {
-        val thread =  Thread.currentThread()
+        val thread = Thread.currentThread()
         return "@[name=${thread.name}, id=${thread.id}]"
     }
 
@@ -59,7 +54,10 @@ internal object Utils {
     }
 
     fun hasPermission(context: Context, permission: String): Boolean {
-        return (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+        return (ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED)
     }
 
     private val NAME_PATTERN = Pattern.compile("[\\w][\\w _-]{1,22}[\\w]")
@@ -78,8 +76,8 @@ internal object Utils {
             return ""
         }
 
-        return bytes.joinToString(separator = "") {
-            eachByte -> "%02X".format(eachByte)
+        return bytes.joinToString(separator = "") { eachByte ->
+            "%02X".format(eachByte)
         }
     }
 
@@ -124,7 +122,7 @@ internal object Utils {
         return buffer.toByteArray()
     }
 
-   fun getExternalFileSize(ctx: Context, uri: Uri?): Long {
+    fun getExternalFileSize(ctx: Context, uri: Uri?): Long {
         val cursor = ctx.contentResolver.query(uri!!, null, null, null, null)
         cursor!!.moveToFirst()
         val index = cursor.getColumnIndex(OpenableColumns.SIZE)
@@ -144,7 +142,9 @@ internal object Utils {
         val buffer = ByteArrayOutputStream()
         var nRead = 0
         val dataArray = ByteArray(size)
-        while (isstream != null && isstream.read(dataArray, 0, dataArray.size).also { nRead = it } != -1) {
+        while (isstream != null && isstream.read(dataArray, 0, dataArray.size)
+                .also { nRead = it } != -1
+        ) {
             buffer.write(dataArray, 0, nRead)
         }
         isstream?.close()
@@ -218,6 +218,16 @@ internal object Utils {
             multiFormatWriter.encode(content, BarcodeFormat.QR_CODE, 250, 250, hints)
         val barcodeEncoder = BarcodeEncoder()
         return barcodeEncoder.createBitmap(bitMatrix)
+    }
+
+    fun getDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER
+        val model = Build.MODEL
+        return if (model.startsWith(manufacturer)) {
+            model
+        } else {
+            "$manufacturer $model"
+        }
     }
 
 }

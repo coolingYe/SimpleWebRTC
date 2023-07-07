@@ -5,16 +5,11 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Looper
-import androidx.core.content.ContextCompat.startActivity
 import com.example.simple_webrtc.model.Contact
 import com.example.simple_webrtc.rtc.WebRTCClient
 import com.example.simple_webrtc.utils.*
-import com.example.simple_webrtc.utils.PacketReader
-import com.example.simple_webrtc.utils.PacketWriter
 import org.json.JSONObject
-import java.net.InetSocketAddress
-import java.net.Socket
-import java.net.SocketAddress
+import java.net.*
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
@@ -25,6 +20,7 @@ abstract class SocketService(
     private val executor = Executors.newSingleThreadExecutor()
 
     abstract fun handleAnswer(remoteDesc: String)
+    abstract fun reportStateChange(state: CallState)
 
     protected fun cleanupRTCPeerConnection() {
         execute {
@@ -87,42 +83,60 @@ abstract class SocketService(
             val action = obj1.getString("action")
 
             Log.d(this, "createOutgoingCallInternal() ---> response : $message")
-            when (action) {
-                "connected" -> {
-                    val answer = obj1.getString("answer")
-                    handleAnswer(answer)
+
+            while (!socket.isClosed) {
+                when (action) {
+                    "connected" -> {
+                        val answer = obj1.getString("answer")
+                        handleAnswer(answer)
+                        break
+                    }
+                    "dismissed" -> {
+                        reportStateChange(CallState.DISMISSED)
+                        break
+                    }
                 }
             }
-
-            while (false) {
-                val response = pr.readMessage()
-                if (response == null) {
-                    Thread.sleep(SOCKET_TIMEOUT_MS / 10)
-                    Log.d(this, "createOutgoingCallInternal() response is null")
-                    continue
-                }
-
-                val message = String((response), Charsets.UTF_8)
-                Log.d(this, "createOutgoingCallInternal() ---> response : $message")
-                val obj1 = JSONObject(message)
-                val action = obj1.getString("action")
-                if (action == "connected") {
-                    val answer = obj1.getString("answer")
-                    handleAnswer(answer)
-                    break
-                }
-            }
-//            closeSocket(socket)
+            closeSocket(socket)
         } ?: return
     }
 
     private fun connectSocket(contact: Contact): Socket? {
+
+        var socketTimeoutException = false
+        var connectException = false
+        var unknownHostException = false
+        var exception = false
+
         val socket = Socket()
-        socket.connect(
-            parseSocketAddress(contact.ipAddress + ":${Constant.SERVER_HTTP_PORT}"),
-            connectTimeout
-        )
-        return socket ?: null
+        try {
+            socket.connect(
+                parseSocketAddress(contact.ipAddress + ":${Constant.SERVER_HTTP_PORT}"),
+                connectTimeout
+            )
+            reportStateChange(CallState.CONNECTING)
+            return socket
+        } catch (e: SocketTimeoutException) {
+            socketTimeoutException = true
+        } catch (e: ConnectException) {
+            connectException = true
+        } catch (e: UnknownHostException) {
+            unknownHostException = true
+        } catch (e: Exception) {
+            exception = true
+        }
+        closeSocket(socket)
+
+        when {
+            socketTimeoutException -> reportStateChange(CallState.ERROR_NO_CONNECTION)
+            connectException -> reportStateChange(CallState.ERROR_CONNECT_PORT)
+            unknownHostException -> reportStateChange(CallState.ERROR_UNKNOWN_HOST)
+            exception -> reportStateChange(CallState.ERROR_COMMUNICATION)
+            contact.ipAddress?.isEmpty() == true -> reportStateChange(CallState.ERROR_NO_ADDRESSES)
+            else -> reportStateChange(CallState.ERROR_NO_NETWORK)
+        }
+
+        return null
     }
 
     private fun parseSocketAddress(addressStr: String): SocketAddress? {
@@ -153,6 +167,23 @@ abstract class SocketService(
             e.printStackTrace()
             Log.w(this, "execute() catched $e")
         }
+    }
+
+    enum class CallState {
+        WAITING,
+        CONNECTING,
+        RINGING,
+        CONNECTED,
+        DISMISSED,
+        ENDED,
+        ERROR_AUTHENTICATION,
+        ERROR_DECRYPTION,
+        ERROR_CONNECT_PORT,
+        ERROR_UNKNOWN_HOST,
+        ERROR_COMMUNICATION,
+        ERROR_NO_CONNECTION,
+        ERROR_NO_ADDRESSES,
+        ERROR_NO_NETWORK
     }
 
     companion object {
@@ -193,6 +224,16 @@ abstract class SocketService(
             val pw = PacketWriter(socket)
             val pr = PacketReader(socket)
 
+            val decline = {
+                try {
+                    val dismissedMessage = "{\"action\":\"dismissed\"}"
+                    pw.writeMessage(dismissedMessage.toByteArray())
+                    socket.close()
+                } catch (e: Exception) {
+                    closeSocket(socket)
+                }
+            }
+
             val request = pr.readMessage()
             if (request == null) {
                 Log.d(this, "createIncomingCallInternal() connection closed")
@@ -228,6 +269,7 @@ abstract class SocketService(
                             }
                             setNegativeButton("Cancel") { dialog, _ ->
                                 run {
+                                    decline()
                                     dialog.dismiss()
                                 }
                             }

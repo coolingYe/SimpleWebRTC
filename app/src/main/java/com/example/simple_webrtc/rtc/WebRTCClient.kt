@@ -4,18 +4,13 @@ import com.example.gesturelib.Camera2Listener
 import com.example.simple_webrtc.MainService
 import com.example.simple_webrtc.SocketService
 import com.example.simple_webrtc.model.Contact
-import com.example.simple_webrtc.utils.BitmapUtil.NV21ToBitmap
-import com.example.simple_webrtc.utils.BitmapUtil.createNV21Data
 import com.example.simple_webrtc.utils.Log
 import com.example.simple_webrtc.utils.PacketWriter
 import com.example.simple_webrtc.utils.Utils
 import org.json.JSONException
 import org.json.JSONObject
 import org.webrtc.*
-import java.net.Inet4Address
-import java.net.NetworkInterface
 import java.net.Socket
-import java.net.SocketException
 import java.nio.ByteBuffer
 
 class WebRTCClient : SocketService {
@@ -25,13 +20,14 @@ class WebRTCClient : SocketService {
     private lateinit var audioSource: AudioSource
     private lateinit var videoSource: VideoSource
     private lateinit var audioTrack: AudioTrack
-    private lateinit var videoTrack: VideoTrack
+    private var videoTrack: VideoTrack ?= null
 
-    private lateinit var videoCapture: VideoCapturer
+    private var videoCapture: VideoCapturer? = null
     private lateinit var surfaceTextureHelper: SurfaceTextureHelper
     private lateinit var eglBase: EglBase
     private var dataChannel: DataChannel? = null
     private var offer: String? = null
+    private var useFrontFacingCamera = true
 
     private var playerView: SurfaceViewRenderer? = null
     private var proxyVideoSink = ProxyVideoSink()
@@ -42,7 +38,7 @@ class WebRTCClient : SocketService {
     private var callContext: CallContext? = null
 
     private var binder: MainService.MainBinder? = null
-    private var contact: Contact ?= null
+    private var contact: Contact? = null
 
     constructor(
         binder: MainService.MainBinder,
@@ -50,7 +46,6 @@ class WebRTCClient : SocketService {
         offer: String
     ) : super(commSocket) {
         this.binder = binder
-        this.contact = contact
         Log.d(this, "RTCCall() created for incoming calls")
         this.offer = offer
     }
@@ -63,21 +58,27 @@ class WebRTCClient : SocketService {
     }
 
     companion object {
-        const val VIDEO_TRACK_ID = "Video1"
-        const val AUDIO_TRACK_ID = "Audio1"
+        private const val VIDEO_TRACK_ID = "Video1"
+        private const val AUDIO_TRACK_ID = "Audio1"
+
+        const val ACTION_TYPE = "ACTION_TYPE"
+        const val MESSAGE = "message"
+        const val HANGUP = "hangUp"
     }
 
     fun start(isIncomingCall: Boolean) {
         this.isIncomingCall = isIncomingCall
         initPeer()
         if (!isIncomingCall) {
-            getVideoTrack()
+            getVideoTrack(createVideoCapture())
             getAudioTrack()
         }
         initRTC()
     }
 
     private fun initPeer() {
+        Utils.checkIsOnMainThread()
+
         val options = PeerConnectionFactory.Options()
         val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
         val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
@@ -140,7 +141,10 @@ class WebRTCClient : SocketService {
                         override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState) {
                             super.onIceGatheringChange(iceGatheringState)
                             if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
-                                createOutgoingCall(contact!!, peerConnection.localDescription.description)
+                                createOutgoingCall(
+                                    contact!!,
+                                    peerConnection.localDescription.description
+                                )
                             }
                         }
 
@@ -215,13 +219,13 @@ class WebRTCClient : SocketService {
             }
 
             if (isIncomingCall.not()) {
-                videoTrack.setEnabled(true)
+                videoTrack?.setEnabled(true)
                 audioTrack.setEnabled(true)
                 peerConnection.addTrack(videoTrack)
                 peerConnection.addTrack(audioTrack)
 
                 playerView?.setMirror(true)
-                videoTrack.addSink(playerView)
+                videoTrack?.addSink(playerView)
 
                 val init = DataChannel.Init()
                 init.ordered = true
@@ -266,7 +270,7 @@ class WebRTCClient : SocketService {
                 Log.d(this, "Dropping frame in proxy because target is null.")
             } else {
                 target.onFrame(frame)
-                camera2Listener?.method(NV21ToBitmap(contextMain, createNV21Data(frame.buffer.toI420()), frame.buffer.width, frame.buffer.height))
+//                camera2Listener?.method(NV21ToBitmap(contextMain, createNV21Data(frame.buffer.toI420()), frame.buffer.width, frame.buffer.height))
             }
         }
 
@@ -302,7 +306,15 @@ class WebRTCClient : SocketService {
             val s = String(data)
             try {
                 Log.d(this, "DataChannel onMessage() message: $s")
-                callContext?.onDataChannelCallback(s)
+                val json = JSONObject(s)
+                if (json.has(ACTION_TYPE)) {
+                    when (json.getString(ACTION_TYPE)) {
+                        MESSAGE -> callContext?.onDataChannelCallback(json.getString(MESSAGE))
+                        HANGUP -> {
+                            reportStateChange(CallState.ENDED)
+                        }
+                    }
+                }
             } catch (e: JSONException) {
                 e.printStackTrace()
             }
@@ -338,6 +350,30 @@ class WebRTCClient : SocketService {
         return true
     }
 
+    fun getFrontCameraEnabled(): Boolean {
+        return useFrontFacingCamera
+    }
+
+    fun switchCamera() {
+        Utils.checkIsOnMainThread()
+        if (videoCapture != null) {
+            val enumerator = Camera2Enumerator(contextMain);
+            val deviceName = enumerator.deviceNames.find { !useFrontFacingCamera == enumerator.isFrontFacing(it) }
+            if (deviceName != null) {
+                (videoCapture as CameraVideoCapturer).switchCamera(object : CameraVideoCapturer.CameraSwitchHandler{
+                    override fun onCameraSwitchDone(p0: Boolean) {
+                        useFrontFacingCamera = p0
+                    }
+
+                    override fun onCameraSwitchError(p0: String?) {
+
+                    }
+
+                }, deviceName)
+            }
+        }
+    }
+
     private fun createAudioConstraints(): MediaConstraints? {
         val audioConstraints = MediaConstraints()
         audioConstraints.mandatory.add(
@@ -367,27 +403,6 @@ class WebRTCClient : SocketService {
         return audioConstraints
     }
 
-    fun getIpAddressString(): String? {
-        try {
-            val enNetI = NetworkInterface
-                .getNetworkInterfaces()
-            while (enNetI.hasMoreElements()) {
-                val netI = enNetI.nextElement()
-                val enumIpAddr = netI
-                    .inetAddresses
-                while (enumIpAddr.hasMoreElements()) {
-                    val inetAddress = enumIpAddr.nextElement()
-                    if (inetAddress is Inet4Address && !inetAddress.isLoopbackAddress()) {
-                        return inetAddress.getHostAddress()
-                    }
-                }
-            }
-        } catch (e: SocketException) {
-            e.printStackTrace()
-        }
-        return "0.0.0.0"
-    }
-
     private fun setRemoteSdp(sdp: String) {
         peerConnection.let {
             val remoteSdp = SessionDescription(SessionDescription.Type.ANSWER, sdp)
@@ -395,14 +410,18 @@ class WebRTCClient : SocketService {
         }
     }
 
-    private fun getVideoTrack(): VideoTrack {
-        videoCapture = createVideoCapture()!!
-        videoSource = peerConnectionFactory.createVideoSource(videoCapture.isScreencast)
-        surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBase.eglBaseContext)
-        videoCapture.initialize(surfaceTextureHelper, contextMain, videoSource.capturerObserver)
-        videoCapture.startCapture(640, 480, 30)
-        videoTrack = peerConnectionFactory.createVideoTrack(VIDEO_TRACK_ID, videoSource)
-        return videoTrack
+    private fun getVideoTrack(videoCapture: VideoCapturer?): VideoTrack? {
+        this.videoCapture = videoCapture
+        videoCapture?.let {videoCap ->
+            videoSource = peerConnectionFactory.createVideoSource(videoCap.isScreencast)
+            surfaceTextureHelper =
+                SurfaceTextureHelper.create("CaptureThread", eglBase.eglBaseContext)
+            videoCap.initialize(surfaceTextureHelper, contextMain, videoSource.capturerObserver)
+            videoCap.startCapture(640, 480, 30)
+            videoTrack = peerConnectionFactory.createVideoTrack(VIDEO_TRACK_ID, videoSource)
+            return videoTrack
+        }
+        return null
     }
 
     private fun getAudioTrack(): AudioTrack {
@@ -441,15 +460,17 @@ class WebRTCClient : SocketService {
         return null
     }
 
-    fun destroy() {
-        playerView?.release()
-        if (isIncomingCall) {
-            videoCapture.dispose()
-            videoTrack.dispose()
+    fun hangup() {
+        Utils.checkIsOnMainThread()
+
+        execute {
+            val json = JSONObject().apply {
+                put(ACTION_TYPE, HANGUP)
+            }
+            if (sendOnDataChannel(json.toString())) {
+                reportStateChange(CallState.ENDED)
+            } else reportStateChange(CallState.ERROR_COMMUNICATION)
         }
-        peerConnection.dispose()
-        peerConnectionFactory.dispose()
-        cleanup()
     }
 
     fun cleanup() {
@@ -469,13 +490,29 @@ class WebRTCClient : SocketService {
         Log.d(this, "cleanup() done")
     }
 
+    fun releaseCamera() {
+        Log.d(this, "releaseCamera()")
+        Utils.checkIsOnMainThread()
+
+        try {
+            videoCapture?.stopCapture()
+        } catch (e: InterruptedException) {
+            e.printStackTrace()
+        }
+    }
+
     override fun handleAnswer(remoteDesc: String) {
         execute {
             setRemoteSdp(remoteDesc)
         }
     }
 
+    override fun reportStateChange(state: CallState) {
+        callContext?.onStateChange(state)
+    }
+
     interface CallContext {
         fun onDataChannelCallback(message: String)
+        fun onStateChange(state: CallState)
     }
 }

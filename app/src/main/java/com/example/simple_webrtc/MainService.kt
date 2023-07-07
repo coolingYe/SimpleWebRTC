@@ -7,8 +7,10 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.widget.Toast
+import com.example.simple_webrtc.model.Contact
 import com.example.simple_webrtc.utils.Constant
 import com.example.simple_webrtc.utils.Log
+import com.example.simple_webrtc.utils.Utils
 import java.io.IOException
 import java.net.ServerSocket
 import java.net.Socket
@@ -33,7 +35,7 @@ class MainService : Service(), Runnable {
 
     override fun run() {
         try {
-            serverSocket = ServerSocket(7653)
+            serverSocket = ServerSocket(Constant.SERVER_HTTP_PORT)
             while (isServerSocketRunning) {
                 try {
                     serverSocket?.let { server ->
@@ -44,7 +46,7 @@ class MainService : Service(), Runnable {
                         }
                     }
                 } catch (e: IOException) {
-                    Log.d(this, "serverSocket open ----->e$e")
+                    Log.d(this, "  open ----->e$e")
                 }
             }
         } catch (e: IOException) {
@@ -61,6 +63,18 @@ class MainService : Service(), Runnable {
 
         fun getSocket(): Socket? {
             return socket
+        }
+
+        fun getCurrentIPAddress(): String? {
+            return Utils.getIpAddressString()
+        }
+
+        fun getDeviceName(): String {
+            return Utils.getDeviceName()
+        }
+
+        fun getContact(): Contact {
+            return Contact(getDeviceName(), getCurrentIPAddress())
         }
     }
 

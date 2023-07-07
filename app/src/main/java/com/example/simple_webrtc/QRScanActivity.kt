@@ -15,6 +15,7 @@ import com.google.zxing.ResultPoint
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
+import org.json.JSONObject
 
 
 class QRScanActivity : AppCompatActivity(), BarcodeCallback {
@@ -58,8 +59,11 @@ class QRScanActivity : AppCompatActivity(), BarcodeCallback {
             if (it.text.isEmpty()) return
             Toast.makeText(this, it.text, Toast.LENGTH_SHORT).show()
             val planSet = HashSet<String>()
+            val json = JSONObject(it.text)
+            val name = json.get("name")
+            val ipAddress = json.get("ipAddress")
             planSet.addAll(SPUtils.getInstance().getStringSet(SERVICE_IP_LIST))
-            planSet.add(it.text)
+            planSet.add("$name,$ipAddress")
             SPUtils.getInstance().put(SERVICE_IP_LIST, planSet)
             val intent = Intent()
             intent.putExtra("QRResult", "Callback")
