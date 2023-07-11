@@ -14,6 +14,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.simple_webrtc.databinding.ActivityMainBinding
@@ -47,6 +48,11 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 binder = service as MainService.MainBinder
+                binder?.refreshContactList().let { contacts ->
+                    if (contacts != null) {
+                        contactAdapter?.updateList(contacts)
+                    }
+                }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -72,45 +78,59 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
                 }
             }
         contactAdapter = ContactAdapter(emptyList())
-        getContactList().let { contacts ->
-            contactAdapter?.setOnClickListener = object : (View, Contact) -> Unit {
-                override fun invoke(p1: View, p2: Contact) {
-                    val intent = Intent(this@MainActivity, CallActivity::class.java)
-                    intent.action = CallActivity.ACTION_OUTGOING_CALL
-                    intent.putExtra(CallActivity.EXTRA_CONTACT, p2)
-                    startActivity(intent)
-                }
+        binding.rvContacts.adapter = contactAdapter
+
+        contactAdapter?.setOnClickListener = object : (View, Contact) -> Unit {
+            override fun invoke(p1: View, p2: Contact) {
+                val intent = Intent(this@MainActivity, CallActivity::class.java)
+                intent.action = CallActivity.ACTION_OUTGOING_CALL
+                intent.putExtra(CallActivity.EXTRA_CONTACT, p2)
+                startActivity(intent)
             }
-            contactAdapter?.setOnLongClickListener = object : (View, Contact) -> Unit {
-                override fun invoke(p1: View, p2: Contact) {
-                    val popupMenu = PopupMenu(this@MainActivity, p1)
-                    popupMenu.menuInflater.inflate(R.menu.menu_item, popupMenu.menu)
-                    popupMenu.show()
-                    popupMenu.setOnMenuItemClickListener { item ->
-                        when (item.itemId) {
-                            R.id.action_edit -> {
-                                showEditDialog(p2)
-                            }
-                            R.id.action_delete -> {
-                                val targetContact = p2.name + "," + p2.ipAddress
-                                delContact(targetContact)
-                                contactAdapter?.updateList(getContactList())
-                            }
+        }
+        contactAdapter?.setOnLongClickListener = object : (View, Contact) -> Unit {
+            override fun invoke(p1: View, p2: Contact) {
+                val popupMenu = PopupMenu(this@MainActivity, p1)
+                popupMenu.menuInflater.inflate(R.menu.menu_item, popupMenu.menu)
+                popupMenu.show()
+                popupMenu.setOnMenuItemClickListener { item ->
+                    when (item.itemId) {
+                        R.id.action_edit -> {
+                            showEditDialog(p2)
                         }
-                        true
+                        R.id.action_delete -> {
+                            val targetContact = p2.name + "," + p2.ipAddress
+                            delContact(targetContact)
+                            binder?.refreshContactList()?.let { contactAdapter?.updateList(it) }
+                        }
                     }
+                    true
                 }
             }
-            binding.rvContacts.adapter = contactAdapter
-            contactAdapter?.updateList(contacts)
+        }
+
+        LocalBroadcastManager.getInstance(this)
+            .registerReceiver(refreshContactListReceiver, IntentFilter("refresh_contact_list"))
+
+        refreshContactListBroadcast()
+    }
+
+    private val refreshContactListReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            Log.d(this, "trigger refreshContactList() from broadcast at ${lifecycle.currentState}")
+            refreshContactList()
         }
     }
 
-    private fun addContact(targetContact: String) {
-        val contactSet = HashSet<String>()
-        contactSet.addAll(SPUtils.getInstance().getStringSet(SERVICE_IP_LIST))
-        contactSet.add(targetContact)
-        SPUtils.getInstance().put(SERVICE_IP_LIST, contactSet)
+    private fun refreshContactList() {
+        Log.d(this, "refreshContactList")
+
+        val binder = binder ?: return
+        val contacts = binder.getContactList()
+
+        runOnUiThread {
+            contactAdapter?.updateList(contacts)
+        }
     }
 
     fun delContact(targetContact: String) {
@@ -137,8 +157,8 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
                     val targetContact = editName.text.toString() + "," + editIp.text
                     val oldContact = contact.name + "," + contact.ipAddress
                     delContact(oldContact)
-                    addContact(targetContact)
-                    contactAdapter?.updateList(getContactList())
+                    binder?.addContact(targetContact)
+                    binder?.let { contactAdapter?.updateList(it.refreshContactList()) }
                     dialog.cancel()
                 }
             }
@@ -146,17 +166,28 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
         }
     }
 
-    private fun getContactList(): List<Contact> {
-        val contactSet = SPUtils.getInstance().getStringSet(SERVICE_IP_LIST)
-        if (contactSet.size > 0) {
-            val dataList = ArrayList<Contact>()
-            contactSet.forEach {
-                val contact = Contact(it.substringBefore(","), it.substringAfter(","))
-                dataList.add(contact)
+    private fun refreshContactListBroadcast() {
+        LocalBroadcastManager.getInstance(this).sendBroadcast(Intent("refresh_contact_list"))
+    }
+
+    private fun showAddDialog() {
+        val view = View.inflate(this@MainActivity, R.layout.dialog_contact_edit, null)
+        val editName = view.findViewById<EditText>(R.id.ed_contact_name)
+        val editIp = view.findViewById<EditText>(R.id.ed_contact_ip)
+        AlertDialog.Builder(this).apply {
+            setTitle("Add Contact")
+            setView(view)
+            setNegativeButton("Cancel", null)
+            setPositiveButton("OK") { dialog, _ ->
+                run {
+                    val targetContact = editName.text.toString() + "," + editIp.text
+                    binder?.addContact(targetContact)
+                    binder?.refreshContactList()?.let { contactAdapter?.updateList(it) }
+                    dialog.cancel()
+                }
             }
-            return dataList
+            show()
         }
-        return emptyList()
     }
 
     private fun updateList() {
@@ -182,13 +213,21 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
+            R.id.action_refresh -> {
+                binder?.refreshContactList()?.let { binder?.pingContacts(it) }
+                true
+            }
+            R.id.action_add -> {
+                showAddDialog()
+                true
+            }
             R.id.action_camera -> {
                 val intent = Intent(this, QRScanActivity::class.java)
                 intentActivityResult?.launch(intent)
                 true
             }
             R.id.action_qr -> {
-                val contact = binder?.getContact()
+                val contact = binder?.getSelfContact()
                 contact?.let {
                     val json = JSONObject().apply {
                         put("name", contact.name)
@@ -199,8 +238,8 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
                 }
                 true
             }
-            R.id.action_settings -> {
-                Toast.makeText(this, "setting clicked", Toast.LENGTH_SHORT).show()
+            R.id.action_about -> {
+                Toast.makeText(this, binder?.getCurrentIPAddress(), Toast.LENGTH_SHORT).show()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -247,6 +286,11 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
         qrDialog.show()
         val ivQr = view.findViewById<ImageView>(R.id.iv_qr)
         ivQr.setImageBitmap(bitmap)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binder?.refreshContactList()?.let { binder?.pingContacts(it) }
     }
 
 }

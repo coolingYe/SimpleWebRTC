@@ -8,6 +8,7 @@ import android.os.Looper
 import com.example.simple_webrtc.model.Contact
 import com.example.simple_webrtc.rtc.WebRTCClient
 import com.example.simple_webrtc.utils.*
+import com.example.simple_webrtc.utils.Utils.parseSocketAddress
 import org.json.JSONObject
 import java.net.*
 import java.util.concurrent.Executors
@@ -139,23 +140,6 @@ abstract class SocketService(
         return null
     }
 
-    private fun parseSocketAddress(addressStr: String): SocketAddress? {
-        val parts = addressStr.split(":".toRegex()).dropLastWhile { it.isEmpty() }
-            .toTypedArray()
-        if (parts.size != 2) {
-            System.err.println("Invalid address format: $addressStr")
-            return null
-        }
-        val host = parts[0]
-        val port: Int = try {
-            parts[1].toInt()
-        } catch (e: NumberFormatException) {
-            System.err.println("Invalid port number: " + parts[1])
-            return null
-        }
-        return InetSocketAddress(host, port)
-    }
-
     protected fun execute(r: Runnable) {
         try {
             executor.execute(r)
@@ -244,7 +228,7 @@ abstract class SocketService(
             val message = String((request), Charsets.UTF_8)
             val obj = JSONObject(message)
             val action = obj.optString("action", "")
-            Log.d(this, "createOutgoingCallInternal() ---> response : $message")
+            Log.d(this, "createIncomingCallInternal() ---> response : $message")
             when (action) {
                 "call" -> {
                     val offer = obj.getString("offer")
@@ -281,6 +265,10 @@ abstract class SocketService(
                         incomingRTCCall = null
                         e.printStackTrace()
                     }
+                }
+                "ping" -> {
+                    val response = "{\"action\":\"pong\"}"
+                    pw.writeMessage(response.toByteArray())
                 }
                 else -> {
                     Log.d(this, "createIncomingCallInternal(): ------> $action");

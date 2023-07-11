@@ -12,11 +12,8 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.journeyapps.barcodescanner.BarcodeEncoder
-import org.webrtc.*
 import java.io.*
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import java.net.SocketException
+import java.net.*
 import java.util.*
 import java.util.regex.Pattern
 
@@ -228,6 +225,23 @@ internal object Utils {
         } else {
             "$manufacturer $model"
         }
+    }
+
+    fun parseSocketAddress(addressStr: String): SocketAddress? {
+        val parts = addressStr.split(":".toRegex()).dropLastWhile { it.isEmpty() }
+            .toTypedArray()
+        if (parts.size != 2) {
+            System.err.println("Invalid address format: $addressStr")
+            return null
+        }
+        val host = parts[0]
+        val port: Int = try {
+            parts[1].toInt()
+        } catch (e: NumberFormatException) {
+            System.err.println("Invalid port number: " + parts[1])
+            return null
+        }
+        return InetSocketAddress(host, port)
     }
 
 }

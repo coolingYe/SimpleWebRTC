@@ -4,6 +4,8 @@ import com.example.gesturelib.Camera2Listener
 import com.example.simple_webrtc.MainService
 import com.example.simple_webrtc.SocketService
 import com.example.simple_webrtc.model.Contact
+import com.example.simple_webrtc.utils.BitmapUtil.NV21ToBitmap
+import com.example.simple_webrtc.utils.BitmapUtil.createNV21Data
 import com.example.simple_webrtc.utils.Log
 import com.example.simple_webrtc.utils.PacketWriter
 import com.example.simple_webrtc.utils.Utils
@@ -261,6 +263,7 @@ class WebRTCClient : SocketService {
     class ProxyVideoSink : VideoSink {
         private var target: VideoSink? = null
         private var camera2Listener: Camera2Listener? = null
+        private var isGestureStart = false
 
         @Synchronized
         override fun onFrame(frame: VideoFrame) {
@@ -270,8 +273,22 @@ class WebRTCClient : SocketService {
                 Log.d(this, "Dropping frame in proxy because target is null.")
             } else {
                 target.onFrame(frame)
-//                camera2Listener?.method(NV21ToBitmap(contextMain, createNV21Data(frame.buffer.toI420()), frame.buffer.width, frame.buffer.height))
+                if (isGestureStart) {
+                    camera2Listener?.method(
+                        NV21ToBitmap(
+                            contextMain,
+                            createNV21Data(frame.buffer.toI420()),
+                            frame.buffer.width,
+                            frame.buffer.height
+                        )
+                    )
+                }
             }
+        }
+
+        @Synchronized
+        fun setIsGestureStart(isGestureStart: Boolean) {
+            this.isGestureStart = isGestureStart
         }
 
         @Synchronized

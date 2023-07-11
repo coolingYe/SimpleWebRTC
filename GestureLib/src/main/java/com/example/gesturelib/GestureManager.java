@@ -157,14 +157,6 @@ public class GestureManager implements Camera2Listener {
 
         if (!TextUtils.isEmpty(akCodeExtra) && !TextUtils.isEmpty(authUriExtra)) {
 
-//            if (!TextUtils.isEmpty(extras.get(2))) {
-//                modelsDirPath = extras.get(2);
-//            }
-//
-//            if (!TextUtils.isEmpty(extras.get(3))) {
-//                licenseFilePath = extras.get(3);
-//            }
-
             String skCodeExtra = extras.get(1);
 
             try {
@@ -223,7 +215,6 @@ public class GestureManager implements Camera2Listener {
     public void method(Bitmap bitmap) {
         if (locationEnumList.size() > 0) {
             personPoseMethod(bitmap);
-            Log.d(String.valueOf(this), "bitmap callback success");
         }
     }
 

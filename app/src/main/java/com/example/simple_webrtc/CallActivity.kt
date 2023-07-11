@@ -7,9 +7,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.view.KeyEvent
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import com.example.gesturelib.Config
 import com.example.gesturelib.GestureManager
 import com.example.gesturelib.LocationEnum
@@ -32,7 +34,7 @@ class CallActivity : AppCompatActivity(), WebRTCClient.CallContext {
     private var proxyVideoSink = WebRTCClient.ProxyVideoSink()
     private val eglBase = EglBase.create()
     private var contact: Contact? = null
-    private val isGestureStart = false
+    private var isGestureStart = false
     private var activityActive = true
 
     companion object {
@@ -40,7 +42,6 @@ class CallActivity : AppCompatActivity(), WebRTCClient.CallContext {
         const val ACTION_INCOMING_CALL = "ACTION_INCOMING_CALL"
         const val EXTRA_CONTACT = "EXTRA_CONTACT"
 
-        var isCallInProgress: Boolean = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,14 +58,7 @@ class CallActivity : AppCompatActivity(), WebRTCClient.CallContext {
                 finish()
             }
         }
-        initViews()
         initListener()
-    }
-
-    private fun initViews() {
-        if (isGestureStart) {
-            initGesture()
-        }
     }
 
     private fun initListener() {
@@ -94,9 +88,21 @@ class CallActivity : AppCompatActivity(), WebRTCClient.CallContext {
             webRTCClient?.switchCamera()
         }
 
-        proxyVideoSink.setCameraCallback {
-            if (it != null && isGestureStart) {
-                gestureManager.method(it)
+        binding.btnGraphics.setOnClickListener {
+            isGestureStart = !isGestureStart
+            binding.overlayView.isVisible = isGestureStart
+            proxyVideoSink.setIsGestureStart(isGestureStart)
+            if (isGestureStart) {
+                initGesture()
+            } else {
+                binding.overlayView.release()
+                gestureManager.releaseAllZee()
+            }
+        }
+
+        proxyVideoSink.setCameraCallback { bitmap ->
+            if (bitmap != null && isGestureStart) {
+                gestureManager.method(bitmap)
             }
         }
     }
@@ -206,6 +212,23 @@ class CallActivity : AppCompatActivity(), WebRTCClient.CallContext {
 
     private fun showToast(hint: String) {
         Toast.makeText(this@CallActivity, hint, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemUI()
+    }
+
+    private fun hideSystemUI() {
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE
+                // Set the content to appear under the system bars so that the
+                // content doesn't resize when the system bars hide and show.
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                // Hide the nav bar and status bar
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN)
     }
 
     override fun onDestroy() {

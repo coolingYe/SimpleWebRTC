@@ -4,6 +4,20 @@
     tools:context="com.example.simple_webrtc.MainActivity">
 
     <item
+        android:id="@+id/action_refresh"
+        android:orderInCategory="100"
+        android:title="Refresh"
+        android:icon="@drawable/ic_refresh"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_add"
+        android:orderInCategory="100"
+        android:title="Add"
+        android:icon="@drawable/add"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_camera"
         android:orderInCategory="100"
         android:title="@string/action_camera"
@@ -16,8 +30,8 @@
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_settings"
+        android:id="@+id/action_about"
         android:orderInCategory="100"
-        android:title="@string/action_settings"
+        android:title="@string/action_about"
         app:showAsAction="never" />
 </menu>

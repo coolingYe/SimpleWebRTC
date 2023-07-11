@@ -57,7 +57,6 @@ public class BitmapUtil {
         in.copyFrom(nv21);
         yuvToRgbIntrinsic.setInput(in);
         yuvToRgbIntrinsic.forEach(out);
-        Log.INSTANCE.d("this", "width: " + width + ", height: " + height);
         Bitmap bmpout = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         out.copyTo(bmpout);
         return bmpout;
