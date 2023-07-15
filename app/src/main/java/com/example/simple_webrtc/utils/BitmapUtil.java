@@ -47,20 +47,41 @@ public class BitmapUtil {
     }
 
     public static Bitmap NV21ToBitmap(Context context, byte[] nv21, int width, int height) {
-        RenderScript rs = RenderScript.create(context);
-        ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
-        Builder yuvType = null;
-        yuvType = (new Builder(rs, Element.U8(rs))).setX(nv21.length);
-        Allocation in = Allocation.createTyped(rs, yuvType.create(), 1);
-        Builder rgbaType = (new Builder(rs, Element.RGBA_8888(rs))).setX(width).setY(height);
-        Allocation out = Allocation.createTyped(rs, rgbaType.create(), 1);
-        in.copyFrom(nv21);
-        yuvToRgbIntrinsic.setInput(in);
-        yuvToRgbIntrinsic.forEach(out);
-        Bitmap bmpout = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        out.copyTo(bmpout);
-        return bmpout;
+        RenderScript rs = null;
+        ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic = null;
+        Allocation in = null;
+        Allocation out = null;
+        Bitmap bitmap = null;
+
+        try {
+            rs = RenderScript.create(context);
+            yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
+            Builder yuvType = (new Builder(rs, Element.U8(rs))).setX(nv21.length);
+            in = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
+            Builder rgbaType = (new Builder(rs, Element.RGBA_8888(rs))).setX(width).setY(height);
+            out = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+            in.copyFrom(nv21);
+            yuvToRgbIntrinsic.setInput(in);
+            yuvToRgbIntrinsic.forEach(out);
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            out.copyTo(bitmap);
+            return bitmap;
+        } finally {
+            if (out != null) {
+                out.destroy();
+            }
+            if (in != null) {
+                in.destroy();
+            }
+            if (yuvToRgbIntrinsic != null) {
+                yuvToRgbIntrinsic.destroy();
+            }
+            if (rs != null) {
+                rs.destroy();
+            }
+        }
     }
+
 
 
     public static void saveBitmap(Bitmap bitmap, int i) {
